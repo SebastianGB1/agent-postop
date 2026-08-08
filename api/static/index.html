@@ -15,10 +15,25 @@
   <main>
     <section class="upload-panel">
       <form id="upload-form">
-        <input type="file" id="file-input" name="file" required />
+        <input type="file" id="file-input" name="files" multiple required />
         <button type="submit">Subir e indexar</button>
       </form>
       <p id="upload-status" class="status"></p>
+    </section>
+
+    <section class="queue-panel">
+      <div class="list-header">
+        <h2>Cola de indexación (<span id="job-count">0</span>)</h2>
+      </div>
+      <table id="job-table">
+        <thead>
+          <tr>
+            <th>Archivo</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody id="job-table-body"></tbody>
+      </table>
     </section>
 
     <section class="list-panel">

@@ -43,11 +43,51 @@ main {
 }
 
 .upload-panel,
+.queue-panel,
 .list-panel {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 1.25rem;
+}
+
+.queue-panel:empty,
+.queue-panel:has(#job-table-body:empty) {
+  display: none;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.badge-pending {
+  background: rgba(154, 163, 175, 0.2);
+  color: var(--muted);
+}
+
+.badge-processing {
+  background: rgba(79, 140, 255, 0.2);
+  color: var(--accent);
+}
+
+.badge-done {
+  background: rgba(63, 185, 108, 0.2);
+  color: #3fb96c;
+}
+
+.badge-error {
+  background: rgba(229, 83, 75, 0.2);
+  color: var(--danger);
+}
+
+.job-error {
+  color: var(--danger);
+  font-size: 0.8rem;
+  margin-top: 0.2rem;
 }
 
 #upload-form {

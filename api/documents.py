@@ -2,20 +2,19 @@
 
 Reutiliza las funciones de alta/baja de agent.rag.ingest para mantener una
 unica implementacion de la logica de indexado; este modulo solo agrega la
-capa HTTP (listar con detalle, ver contenido, subir archivo, eliminar).
+capa HTTP (listar con detalle, ver contenido, subir archivos, eliminar) y la
+cola de ingesta (api.jobs) para procesar varios archivos de a uno.
 """
 
 import logging
-import tempfile
-from pathlib import Path
 
 from chromadb.api.types import GetResult
 from fastapi import APIRouter, HTTPException, UploadFile
-from google.genai.errors import ClientError
 from pydantic import BaseModel
 
-from agent.rag.ingest import add_document, remove_document
+from agent.rag.ingest import remove_document
 from agent.rag.store import get_vector_store
+from api.jobs import IngestJob, enqueue, list_jobs
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +36,24 @@ class DocumentDetail(BaseModel):
     doc_id: str
     filename: str
     chunks: list[Chunk]
+
+
+class JobStatus(BaseModel):
+    job_id: str
+    filename: str
+    status: str
+    doc_id: str | None = None
+    error: str | None = None
+
+
+def _to_job_status(job: IngestJob) -> JobStatus:
+    return JobStatus(
+        job_id=job.job_id,
+        filename=job.filename,
+        status=job.status,
+        doc_id=job.doc_id,
+        error=job.error,
+    )
 
 
 def _collection_records() -> GetResult:
@@ -65,6 +82,28 @@ def list_documents() -> list[DocumentSummary]:
     ]
 
 
+@router.post("/uploads", response_model=list[JobStatus], status_code=202)
+async def upload_documents(files: list[UploadFile]) -> list[JobStatus]:
+    """Encola uno o varios archivos para indexarlos de a uno en segundo plano."""
+    if not files:
+        raise HTTPException(status_code=400, detail="Debes subir al menos un archivo")
+
+    jobs = []
+    for file in files:
+        if not file.filename:
+            raise HTTPException(status_code=400, detail="Cada archivo debe tener un nombre")
+        content = await file.read()
+        jobs.append(await enqueue(file.filename, content))
+
+    return [_to_job_status(job) for job in jobs]
+
+
+@router.get("/uploads", response_model=list[JobStatus])
+def get_uploads() -> list[JobStatus]:
+    """Estado de la cola de ingesta: pendiente, procesando, listo o error."""
+    return [_to_job_status(job) for job in list_jobs()]
+
+
 @router.get("/{doc_id}", response_model=DocumentDetail)
 def get_document(doc_id: str) -> DocumentDetail:
     records = _collection_records()
@@ -83,38 +122,6 @@ def get_document(doc_id: str) -> DocumentDetail:
         raise HTTPException(status_code=404, detail=f"Documento '{doc_id}' no encontrado")
 
     return DocumentDetail(doc_id=doc_id, filename=filename, chunks=chunks)
-
-
-@router.post("", response_model=DocumentSummary, status_code=201)
-async def upload_document(file: UploadFile) -> DocumentSummary:
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="El archivo debe tener un nombre")
-
-    filename = file.filename
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        tmp_path = Path(tmp_dir) / filename
-        tmp_path.write_bytes(await file.read())
-        try:
-            doc_id = add_document(tmp_path)
-        except ClientError as exc:
-            if exc.code == 429:
-                logger.warning("Cuota de embeddings de Gemini agotada al indexar %s", filename)
-                raise HTTPException(
-                    status_code=429,
-                    detail=(
-                        "Se agoto la cuota de la API de embeddings de Gemini "
-                        "(aiplatform.googleapis.com). Intenta de nuevo mas tarde o "
-                        "solicita un aumento de cuota en Google Cloud."
-                    ),
-                ) from exc
-            raise HTTPException(status_code=502, detail=f"Error del proveedor de embeddings: {exc.message}") from exc
-
-    records = _collection_records()
-    metadatas = records.get("metadatas") or []
-    chunk_count = sum(
-        1 for metadata in metadatas if metadata and metadata.get("document_id") == doc_id
-    )
-    return DocumentSummary(doc_id=doc_id, filename=filename, chunk_count=chunk_count)
 
 
 @router.delete("/{doc_id}", status_code=204)

@@ -8,6 +8,18 @@ const overlay = document.getElementById("detail-overlay");
 const detailTitle = document.getElementById("detail-title");
 const detailChunks = document.getElementById("detail-chunks");
 const closeDetailBtn = document.getElementById("close-detail");
+const jobTableBody = document.getElementById("job-table-body");
+const jobCount = document.getElementById("job-count");
+
+const STATUS_LABELS = {
+  pending: "Pendiente",
+  processing: "Procesando",
+  done: "Listo",
+  error: "Error",
+};
+
+let pollHandle = null;
+const notifiedDone = new Set();
 
 async function loadDocuments() {
   listStatus.textContent = "Cargando...";
@@ -103,26 +115,91 @@ async function deleteDocument(docId, filename) {
   }
 }
 
+function renderJobs(jobs) {
+  jobCount.textContent = jobs.length;
+  jobTableBody.innerHTML = "";
+
+  let hasNewlyDone = false;
+
+  for (const job of jobs) {
+    if (job.status === "done" && !notifiedDone.has(job.job_id)) {
+      notifiedDone.add(job.job_id);
+      hasNewlyDone = true;
+    }
+
+    const row = document.createElement("tr");
+
+    const nameCell = document.createElement("td");
+    nameCell.textContent = job.filename;
+
+    const statusCell = document.createElement("td");
+    const badge = document.createElement("span");
+    badge.className = `badge badge-${job.status}`;
+    badge.textContent = STATUS_LABELS[job.status] || job.status;
+    statusCell.appendChild(badge);
+
+    if (job.status === "error" && job.error) {
+      const errDiv = document.createElement("div");
+      errDiv.className = "job-error";
+      errDiv.textContent = job.error;
+      statusCell.appendChild(errDiv);
+    }
+
+    row.appendChild(nameCell);
+    row.appendChild(statusCell);
+    jobTableBody.appendChild(row);
+  }
+
+  if (hasNewlyDone) loadDocuments();
+}
+
+async function refreshJobs() {
+  try {
+    const res = await fetch("/api/documents/uploads");
+    if (!res.ok) throw new Error(`Error ${res.status}`);
+    const jobs = await res.json();
+    renderJobs(jobs);
+
+    const stillActive = jobs.some((j) => j.status === "pending" || j.status === "processing");
+    if (stillActive) {
+      startPolling();
+    } else if (pollHandle) {
+      clearInterval(pollHandle);
+      pollHandle = null;
+    }
+  } catch {
+    // Ignora fallos puntuales de polling; el proximo tick reintenta.
+  }
+}
+
+function startPolling() {
+  if (pollHandle) return;
+  pollHandle = setInterval(refreshJobs, 1500);
+}
+
 uploadForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const fileInput = document.getElementById("file-input");
-  const file = fileInput.files[0];
-  if (!file) return;
+  const files = Array.from(fileInput.files);
+  if (files.length === 0) return;
 
-  uploadStatus.textContent = `Subiendo ${file.name}...`;
+  uploadStatus.textContent = `Encolando ${files.length} archivo(s)...`;
   uploadStatus.classList.remove("error");
 
   const formData = new FormData();
-  formData.append("file", file);
+  for (const file of files) {
+    formData.append("files", file);
+  }
 
   try {
-    const res = await fetch("/api/documents", { method: "POST", body: formData });
+    const res = await fetch("/api/documents/uploads", { method: "POST", body: formData });
     if (!res.ok) throw new Error(`Error ${res.status}`);
-    uploadStatus.textContent = `"${file.name}" indexado correctamente.`;
+    const jobs = await res.json();
+    uploadStatus.textContent = `${jobs.length} archivo(s) en cola de indexacion.`;
     uploadForm.reset();
-    await loadDocuments();
+    await refreshJobs();
   } catch (err) {
-    uploadStatus.textContent = `No se pudo subir el archivo: ${err.message}`;
+    uploadStatus.textContent = `No se pudo subir los archivos: ${err.message}`;
     uploadStatus.classList.add("error");
   }
 });
@@ -134,3 +211,4 @@ overlay.addEventListener("click", (e) => {
 });
 
 loadDocuments();
+refreshJobs();

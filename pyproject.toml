@@ -1,0 +1,10 @@
+[project]
+name = "Agent-larry"
+version = "0.1.0"
+description = "Agente de voz para atencion post operatorio"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "aiohttp>=3.14.3",
+    "pipecat-ai-prebuilt>=1.0.5",
+]

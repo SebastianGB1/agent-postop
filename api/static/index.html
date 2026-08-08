@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Documentos RAG - Larry</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Documentos indexados</h1>
+    <p class="subtitle">Base de conocimiento post operatoria (ChromaDB)</p>
+  </header>
+
+  <main>
+    <section class="upload-panel">
+      <form id="upload-form">
+        <input type="file" id="file-input" name="file" required />
+        <button type="submit">Subir e indexar</button>
+      </form>
+      <p id="upload-status" class="status"></p>
+    </section>
+
+    <section class="list-panel">
+      <div class="list-header">
+        <h2>Documentos (<span id="doc-count">0</span>)</h2>
+        <button id="refresh-btn" title="Actualizar">Actualizar</button>
+      </div>
+      <p id="list-status" class="status"></p>
+      <table id="doc-table">
+        <thead>
+          <tr>
+            <th>Documento</th>
+            <th>Fragmentos</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="doc-table-body"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <div id="detail-overlay" class="overlay hidden">
+    <div class="detail-panel">
+      <div class="detail-header">
+        <h2 id="detail-title"></h2>
+        <button id="close-detail">Cerrar</button>
+      </div>
+      <div id="detail-chunks"></div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

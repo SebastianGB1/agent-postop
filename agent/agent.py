@@ -33,6 +33,8 @@ from pipecat.transcriptions.language import Language
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.workers.runner import WorkerRunner
 
+from agent.rag.tool import knowledge_base_tool
+
 load_dotenv(override=True)
 
 logging.basicConfig(level=logging.INFO)
@@ -42,7 +44,10 @@ SYSTEM_PROMPT = (
     "Eres Larry, un asistente de voz que conversa siempre en espanol. "
     "Tus respuestas se convierten a audio, asi que evita emojis, markdown o "
     "cualquier formato que no se pueda hablar. Responde de forma breve, clara "
-    "y natural, como en una conversacion hablada, siempre en espanol."
+    "y natural, como en una conversacion hablada, siempre en espanol. "
+    "Cuando el usuario pregunte sobre cuidados, sintomas o indicaciones post "
+    "operatorias, usa la herramienta buscar_en_base_de_conocimiento antes de "
+    "responder en vez de inventar informacion."
 )
 
 transport_params = {
@@ -80,7 +85,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         ),
     )
 
-    context = LLMContext()
+    context = LLMContext(tools=[knowledge_base_tool])
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(vad_analyzer=SileroVADAnalyzer()),

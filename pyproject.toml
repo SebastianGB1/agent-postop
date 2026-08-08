@@ -6,6 +6,10 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "aiohttp>=3.14.3",
+    "llama-index-core>=0.14.23",
+    "llama-index-embeddings-google-genai>=0.5.1",
+    "llama-index-readers-file>=0.6.0",
+    "llama-index-vector-stores-chroma>=0.5.5",
     "pipecat-ai-prebuilt>=1.0.5",
     "pipecat-ai[cartesia,deepgram,google,silero,webrtc]>=1.7.0",
 ]

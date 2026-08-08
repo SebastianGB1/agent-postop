@@ -1,0 +1,38 @@
+services:
+  # --- Base de datos relacional ---
+  postgres:
+    image: postgres:16-alpine
+    container_name: larry-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: agent-larry
+      POSTGRES_USER: agent
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devpassword123}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agent -d agent-larry"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # --- Vector store para RAG ---
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: larry-chromadb
+    ports:
+      - "8001:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v2/heartbeat"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  pg_data:
+  chroma_data:

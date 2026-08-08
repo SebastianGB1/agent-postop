@@ -33,7 +33,7 @@ function renderDocuments(docs) {
     row.className = "doc-row";
 
     const nameCell = document.createElement("td");
-    nameCell.textContent = doc.doc_id;
+    nameCell.textContent = doc.filename;
 
     const countCell = document.createElement("td");
     countCell.textContent = doc.chunk_count;
@@ -44,7 +44,7 @@ function renderDocuments(docs) {
     deleteBtn.className = "danger";
     deleteBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      deleteDocument(doc.doc_id);
+      deleteDocument(doc.doc_id, doc.filename);
     });
     actionCell.appendChild(deleteBtn);
 
@@ -58,14 +58,15 @@ function renderDocuments(docs) {
 }
 
 async function openDetail(docId) {
-  detailTitle.textContent = docId;
-  detailChunks.innerHTML = "Cargando...";
+  detailTitle.textContent = "Cargando...";
+  detailChunks.innerHTML = "";
   overlay.classList.remove("hidden");
 
   try {
     const res = await fetch(`/api/documents/${encodeURIComponent(docId)}`);
     if (!res.ok) throw new Error(`Error ${res.status}`);
     const detail = await res.json();
+    detailTitle.textContent = `${detail.filename} (${detail.doc_id})`;
     detailChunks.innerHTML = "";
     for (const chunk of detail.chunks) {
       const div = document.createElement("div");
@@ -87,8 +88,8 @@ async function openDetail(docId) {
   }
 }
 
-async function deleteDocument(docId) {
-  if (!confirm(`Eliminar "${docId}" del indice?`)) return;
+async function deleteDocument(docId, filename) {
+  if (!confirm(`Eliminar "${filename}" del indice?`)) return;
 
   try {
     const res = await fetch(`/api/documents/${encodeURIComponent(docId)}`, {

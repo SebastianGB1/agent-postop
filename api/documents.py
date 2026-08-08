@@ -29,11 +29,13 @@ class Chunk(BaseModel):
 
 class DocumentSummary(BaseModel):
     doc_id: str
+    filename: str
     chunk_count: int
 
 
 class DocumentDetail(BaseModel):
     doc_id: str
+    filename: str
     chunks: list[Chunk]
 
 
@@ -48,15 +50,18 @@ def list_documents() -> list[DocumentSummary]:
     metadatas = records.get("metadatas") or []
 
     counts: dict[str, int] = {}
+    filenames: dict[str, str] = {}
     for metadata in metadatas:
         doc_id = metadata.get("document_id") if metadata else None
         if not doc_id:
             continue
+        doc_id = str(doc_id)
         counts[doc_id] = counts.get(doc_id, 0) + 1
+        filenames.setdefault(doc_id, str(metadata.get("source", "")))
 
     return [
-        DocumentSummary(doc_id=doc_id, chunk_count=count)
-        for doc_id, count in sorted(counts.items())
+        DocumentSummary(doc_id=doc_id, filename=filenames[doc_id], chunk_count=count)
+        for doc_id, count in sorted(counts.items(), key=lambda item: filenames[item[0]])
     ]
 
 
@@ -67,16 +72,17 @@ def get_document(doc_id: str) -> DocumentDetail:
     metadatas = records.get("metadatas") or []
     texts = records.get("documents") or []
 
-    chunks = [
-        Chunk(node_id=node_id, text=text or "")
-        for node_id, metadata, text in zip(ids, metadatas, texts)
-        if metadata and metadata.get("document_id") == doc_id
-    ]
+    chunks: list[Chunk] = []
+    filename = ""
+    for node_id, metadata, text in zip(ids, metadatas, texts):
+        if metadata and metadata.get("document_id") == doc_id:
+            chunks.append(Chunk(node_id=node_id, text=text or ""))
+            filename = str(metadata.get("source", filename))
 
     if not chunks:
         raise HTTPException(status_code=404, detail=f"Documento '{doc_id}' no encontrado")
 
-    return DocumentDetail(doc_id=doc_id, chunks=chunks)
+    return DocumentDetail(doc_id=doc_id, filename=filename, chunks=chunks)
 
 
 @router.post("", response_model=DocumentSummary, status_code=201)
@@ -84,14 +90,15 @@ async def upload_document(file: UploadFile) -> DocumentSummary:
     if not file.filename:
         raise HTTPException(status_code=400, detail="El archivo debe tener un nombre")
 
+    filename = file.filename
     with tempfile.TemporaryDirectory() as tmp_dir:
-        tmp_path = Path(tmp_dir) / file.filename
+        tmp_path = Path(tmp_dir) / filename
         tmp_path.write_bytes(await file.read())
         try:
-            add_document(tmp_path)
+            doc_id = add_document(tmp_path)
         except ClientError as exc:
             if exc.code == 429:
-                logger.warning("Cuota de embeddings de Gemini agotada al indexar %s", file.filename)
+                logger.warning("Cuota de embeddings de Gemini agotada al indexar %s", filename)
                 raise HTTPException(
                     status_code=429,
                     detail=(
@@ -105,9 +112,9 @@ async def upload_document(file: UploadFile) -> DocumentSummary:
     records = _collection_records()
     metadatas = records.get("metadatas") or []
     chunk_count = sum(
-        1 for metadata in metadatas if metadata and metadata.get("document_id") == file.filename
+        1 for metadata in metadatas if metadata and metadata.get("document_id") == doc_id
     )
-    return DocumentSummary(doc_id=file.filename, chunk_count=chunk_count)
+    return DocumentSummary(doc_id=doc_id, filename=filename, chunk_count=chunk_count)
 
 
 @router.delete("/{doc_id}", status_code=204)

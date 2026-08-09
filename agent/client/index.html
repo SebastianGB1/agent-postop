@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Larry — Llamada de voz</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #1e293b;
+      --panel-border: #334155;
+      --text: #e2e8f0;
+      --text-muted: #94a3b8;
+      --accent: #14b8a6;
+      --accent-hover: #0d9488;
+      --danger: #ef4444;
+      --danger-hover: #dc2626;
+      --ok: #22c55e;
+      --warn: #f59e0b;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: radial-gradient(circle at top, #1e293b 0%, var(--bg) 65%);
+      color: var(--text);
+      min-height: 100vh;
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      padding: 2.5rem 1rem;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 640px;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 16px;
+      box-shadow: 0 20px 50px -20px rgba(0, 0, 0, 0.6);
+      padding: 1.75rem;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.5rem;
+    }
+
+    h1 {
+      font-size: 1.15rem;
+      font-weight: 600;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    h1 .logo {
+      font-size: 1.4rem;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      padding: 0.3rem 0.7rem;
+      border: 1px solid var(--panel-border);
+      border-radius: 999px;
+    }
+
+    .status .dot {
+      width: 0.5rem;
+      height: 0.5rem;
+      border-radius: 50%;
+      background: var(--text-muted);
+      transition: background 0.2s ease;
+    }
+
+    .status.connected .dot {
+      background: var(--ok);
+      box-shadow: 0 0 6px var(--ok);
+    }
+
+    .status.connecting .dot {
+      background: var(--warn);
+      box-shadow: 0 0 6px var(--warn);
+    }
+
+    .patient-field {
+      margin-bottom: 1rem;
+    }
+
+    .patient-field label {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-bottom: 0.35rem;
+    }
+
+    select {
+      width: 100%;
+      padding: 0.6rem 0.75rem;
+      font-size: 0.9rem;
+      color: var(--text);
+      background: #0b1220;
+      border: 1px solid var(--panel-border);
+      border-radius: 10px;
+      cursor: pointer;
+    }
+
+    select:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+
+    select:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .controls {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+
+    button {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.7rem 1rem;
+      font-size: 0.95rem;
+      font-weight: 500;
+      color: var(--text);
+      background: var(--panel-border);
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.15s ease, transform 0.1s ease;
+    }
+
+    button:hover:not(:disabled) {
+      transform: translateY(-1px);
+    }
+
+    button:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.4;
+    }
+
+    #connectBtn {
+      background: var(--accent);
+    }
+
+    #connectBtn:hover:not(:disabled) {
+      background: var(--accent-hover);
+    }
+
+    #connectBtn.connected {
+      background: var(--danger);
+    }
+
+    #connectBtn.connected:hover:not(:disabled) {
+      background: var(--danger-hover);
+    }
+
+    #micBtn.muted {
+      background: #475569;
+    }
+
+    #micBtn.active {
+      background: #0ea5e9;
+    }
+
+    .chat {
+      width: 100%;
+      height: 55vh;
+      background: #0b1220;
+      border: 1px solid var(--panel-border);
+      border-radius: 10px;
+      padding: 1rem;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    .chat:empty::before {
+      content: "La conversación aparece aquí...";
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    .msg {
+      max-width: 78%;
+      padding: 0.55rem 0.85rem;
+      border-radius: 14px;
+      font-size: 0.9rem;
+      line-height: 1.45;
+      word-wrap: break-word;
+      animation: pop-in 0.15s ease;
+    }
+
+    .msg .who {
+      display: block;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      opacity: 0.75;
+      margin-bottom: 0.15rem;
+    }
+
+    .msg.agente {
+      align-self: flex-start;
+      background: #1f2c40;
+      border: 1px solid #2c3d57;
+      border-bottom-left-radius: 4px;
+      color: var(--text);
+    }
+
+    .msg.agente .who {
+      color: #7dd3fc;
+    }
+
+    .msg.paciente {
+      align-self: flex-end;
+      background: #0f5d54;
+      border: 1px solid #14746a;
+      border-bottom-right-radius: 4px;
+      color: #ecfdf5;
+    }
+
+    .msg.paciente .who {
+      color: #5eead4;
+    }
+
+    .msg.error {
+      align-self: center;
+      background: transparent;
+      border: 1px dashed var(--danger);
+      color: #fca5a5;
+      font-size: 0.78rem;
+      text-align: center;
+    }
+
+    .msg.error .who {
+      color: var(--danger);
+    }
+
+    @keyframes pop-in {
+      from {
+        opacity: 0;
+        transform: translateY(4px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <header>
+      <h1><span class="logo">🩺</span> Larry — Llamada de voz</h1>
+      <div class="status" id="status">
+        <span class="dot"></span>
+        <span id="statusLabel">Desconectado</span>
+      </div>
+    </header>
+
+    <div class="patient-field">
+      <label for="patientSelect">Paciente</label>
+      <select id="patientSelect">
+        <option value="">Cargando pacientes…</option>
+      </select>
+    </div>
+
+    <div class="controls">
+      <button id="connectBtn">📞 Conectar</button>
+      <button id="micBtn" class="muted" disabled>🔇 Micrófono apagado</button>
+    </div>
+
+    <div class="chat" id="transcript"></div>
+    <audio id="botAudio" autoplay></audio>
+  </div>
+
+  <script type="module">
+    import { PipecatClient, RTVIEvent } from "https://esm.sh/@pipecat-ai/client-js@1.13.0";
+    import { SmallWebRTCTransport } from "https://esm.sh/@pipecat-ai/small-webrtc-transport@1.10.6";
+
+    const connectBtn = document.getElementById("connectBtn");
+    const micBtn = document.getElementById("micBtn");
+    const patientSelect = document.getElementById("patientSelect");
+    const transcriptEl = document.getElementById("transcript");
+    const botAudioEl = document.getElementById("botAudio");
+    const statusEl = document.getElementById("status");
+    const statusLabelEl = document.getElementById("statusLabel");
+
+    async function loadPatients() {
+      try {
+        const res = await fetch("/api/patients");
+        const patients = await res.json();
+        patientSelect.innerHTML = "";
+        for (const p of patients) {
+          const opt = document.createElement("option");
+          opt.value = p.paciente_id;
+          opt.textContent = p.nombre_completo;
+          patientSelect.appendChild(opt);
+        }
+        if (!patients.length) {
+          patientSelect.innerHTML = '<option value="">Sin pacientes disponibles</option>';
+        }
+      } catch (err) {
+        patientSelect.innerHTML = '<option value="">No se pudo cargar la lista</option>';
+      }
+    }
+    loadPatients();
+
+    let lastLine = null;
+
+    function appendLine(speaker, text) {
+      const line = `${speaker}: ${text}`;
+      if (line === lastLine) return;
+      lastLine = line;
+
+      const bubble = document.createElement("div");
+      bubble.className = `msg ${speaker.toLowerCase()}`;
+
+      const who = document.createElement("span");
+      who.className = "who";
+      who.textContent = speaker;
+      bubble.appendChild(who);
+
+      bubble.appendChild(document.createTextNode(text));
+
+      transcriptEl.appendChild(bubble);
+      transcriptEl.scrollTop = transcriptEl.scrollHeight;
+    }
+
+    function setStatus(state, label) {
+      statusEl.classList.remove("connected", "connecting");
+      if (state) statusEl.classList.add(state);
+      statusLabelEl.textContent = label;
+    }
+
+    const client = new PipecatClient({
+      transport: new SmallWebRTCTransport(),
+      enableMic: true,
+      enableCam: false,
+      callbacks: {
+        onUserTranscript: (data) => {
+          if (data.final) appendLine("Paciente", data.text);
+        },
+        onBotTranscript: (data) => {
+          appendLine("Agente", data.text);
+        },
+        onTrackStarted: (track, participant) => {
+          if (track.kind === "audio" && !participant?.local) {
+            botAudioEl.srcObject = new MediaStream([track]);
+          }
+        },
+        onDisconnected: () => setConnected(false),
+        onError: (message) => appendLine("Error", message?.data?.error ?? String(message)),
+      },
+    });
+
+    let connected = false;
+
+    function updateMicButton() {
+      const enabled = client.isMicEnabled;
+      micBtn.textContent = enabled ? "🎤 Micrófono encendido" : "🔇 Micrófono apagado";
+      micBtn.classList.toggle("active", enabled);
+      micBtn.classList.toggle("muted", !enabled);
+    }
+
+    function setConnected(value) {
+      connected = value;
+      connectBtn.disabled = false;
+      connectBtn.textContent = value ? "📵 Desconectar" : "📞 Conectar";
+      connectBtn.classList.toggle("connected", value);
+      micBtn.disabled = !value;
+      patientSelect.disabled = value;
+      setStatus(value ? "connected" : null, value ? "Conectado" : "Desconectado");
+      if (value) updateMicButton();
+    }
+
+    connectBtn.addEventListener("click", async () => {
+      if (connected) {
+        await client.disconnect();
+        setConnected(false);
+        return;
+      }
+      connectBtn.disabled = true;
+      connectBtn.textContent = "Conectando…";
+      setStatus("connecting", "Conectando…");
+      patientSelect.disabled = true;
+      try {
+        await client.startBotAndConnect({
+          endpoint: "/start",
+          requestData: { body: { paciente_id: patientSelect.value } },
+        });
+        setConnected(true);
+      } catch (err) {
+        patientSelect.disabled = false;
+        appendLine("Error", err?.message ?? String(err));
+        connectBtn.disabled = false;
+        connectBtn.textContent = "📞 Conectar";
+        setStatus(null, "Desconectado");
+      }
+    });
+
+    micBtn.addEventListener("click", () => {
+      client.enableMic(!client.isMicEnabled);
+      updateMicButton();
+    });
+  </script>
+</body>
+</html>

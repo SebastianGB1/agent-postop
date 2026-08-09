@@ -11,10 +11,14 @@ Uso:
     # abre http://localhost:7860 en el navegador
 """
 
+import asyncio
 import logging
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
@@ -24,6 +28,7 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregatorParams,
 )
+from pipecat.runner.run import app as runner_app
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
 from pipecat.services.cartesia.tts import CartesiaTTSService
@@ -33,12 +38,29 @@ from pipecat.transcriptions.language import Language
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.workers.runner import WorkerRunner
 
+from agent.patients import get_patient_context, list_patients
 from agent.rag.tool import knowledge_base_tool
 
 load_dotenv(override=True)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Cliente propio y minimo (conectar, mic on/off, transcripcion) en vez del UI
+# prebuilt de pipecat-ai-prebuilt. Se registra antes de pipecat.runner.run.main()
+# para que gane sobre el redirect a /client que agrega el dev runner.
+CLIENT_DIR = Path(__file__).parent / "client"
+runner_app.mount("/ui", StaticFiles(directory=CLIENT_DIR, html=True), name="ui")
+
+
+@runner_app.get("/", include_in_schema=False)
+async def _root_redirect():
+    return RedirectResponse(url="/ui/")
+
+
+@runner_app.get("/api/patients")
+async def _list_patients():
+    return await asyncio.to_thread(list_patients)
 
 SYSTEM_PROMPT = (
     "Eres Larry, un asistente de voz que conversa siempre en espanol. "
@@ -60,6 +82,11 @@ transport_params = {
 
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     logger.info("Starting bot")
+
+    paciente_id = (runner_args.body or {}).get("paciente_id")
+    patient = await asyncio.to_thread(get_patient_context, paciente_id) if paciente_id else None
+    if paciente_id and not patient:
+        logger.warning("Paciente '%s' no encontrado en la base de datos", paciente_id)
 
     stt = DeepgramSTTService(
         api_key=os.environ["DEEPGRAM_API_KEY"],
@@ -115,9 +142,14 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
         logger.info("Client connected")
-        context.add_message(
-            {"role": "developer", "content": "Saluda al usuario y pregunta en que puedes ayudarlo."}
-        )
+        if patient:
+            greeting = (
+                f"Saluda a {patient['nombre_completo']} por su nombre y pregunta como se ha "
+                f"sentido desde su {patient['procedimiento']}."
+            )
+        else:
+            greeting = "Saluda al usuario y pregunta en que puedes ayudarlo."
+        context.add_message({"role": "developer", "content": greeting})
         await worker.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_disconnected")

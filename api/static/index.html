@@ -21,24 +21,21 @@
       <p id="upload-status" class="status"></p>
     </section>
 
-    <section class="queue-panel">
-      <div class="list-header">
-        <h2>Cola de indexación (<span id="job-count">0</span>)</h2>
-      </div>
-      <table id="job-table">
-        <thead>
-          <tr>
-            <th>Archivo</th>
-            <th>Estado</th>
-          </tr>
-        </thead>
-        <tbody id="job-table-body"></tbody>
-      </table>
-    </section>
+    <nav class="tabs" id="tabs">
+      <button class="tab-btn active" data-tab="documents">
+        Archivos indexados (<span id="doc-count">0</span>)
+      </button>
+      <button class="tab-btn" data-tab="queue">
+        Cola de indexación (<span id="job-count">0</span>)
+      </button>
+      <button class="tab-btn" data-tab="summaries">
+        Resúmenes de llamadas (<span id="summary-count">0</span>)
+      </button>
+    </nav>
 
-    <section class="list-panel">
+    <section class="tab-panel list-panel" id="tab-documents">
       <div class="list-header">
-        <h2>Documentos (<span id="doc-count">0</span>)</h2>
+        <h2>Documentos</h2>
         <button id="refresh-btn" title="Actualizar">Actualizar</button>
       </div>
       <p id="list-status" class="status"></p>
@@ -51,6 +48,41 @@
           </tr>
         </thead>
         <tbody id="doc-table-body"></tbody>
+      </table>
+    </section>
+
+    <section class="tab-panel queue-panel hidden" id="tab-queue">
+      <div class="list-header">
+        <h2>Cola de indexación</h2>
+      </div>
+      <table id="job-table">
+        <thead>
+          <tr>
+            <th>Archivo</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody id="job-table-body"></tbody>
+      </table>
+    </section>
+
+    <section class="tab-panel list-panel hidden" id="tab-summaries">
+      <div class="list-header">
+        <h2>Resúmenes de llamadas</h2>
+        <button id="refresh-summaries-btn" title="Actualizar">Actualizar</button>
+      </div>
+      <p id="summary-status" class="status"></p>
+      <table id="summary-table">
+        <thead>
+          <tr>
+            <th>Paciente</th>
+            <th>Procedimiento</th>
+            <th>Clasificación</th>
+            <th>Síntomas / próximos pasos</th>
+            <th>Fecha</th>
+          </tr>
+        </thead>
+        <tbody id="summary-table-body"></tbody>
       </table>
     </section>
   </main>

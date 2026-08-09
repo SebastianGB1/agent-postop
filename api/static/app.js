@@ -32,6 +32,18 @@ const STATUS_LABELS = {
 let pollHandle = null;
 const notifiedDone = new Set();
 
+const tabButtons = document.querySelectorAll(".tab-btn");
+const tabPanels = document.querySelectorAll(".tab-panel");
+
+tabButtons.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    tabButtons.forEach((b) => b.classList.toggle("active", b === btn));
+    tabPanels.forEach((panel) =>
+      panel.classList.toggle("hidden", panel.id !== `tab-${btn.dataset.tab}`)
+    );
+  });
+});
+
 async function loadDocuments() {
   listStatus.textContent = "Cargando...";
   listStatus.classList.remove("error");

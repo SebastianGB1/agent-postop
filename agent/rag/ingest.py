@@ -21,7 +21,12 @@ from pathlib import Path
 from dotenv import load_dotenv
 from llama_index.core import Document, SimpleDirectoryReader, VectorStoreIndex
 
-from agent.rag.store import ChromaVectorStore, get_embed_model, get_vector_store
+from agent.rag.store import (
+    ChromaVectorStore,
+    get_embed_model,
+    get_semantic_splitter,
+    get_vector_store,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -45,9 +50,16 @@ def add_document(path: Path) -> str:
     doc_id = str(uuid.uuid4())
     document = Document(text=text, doc_id=doc_id, metadata={"source": source})
 
+    nodes = get_semantic_splitter().get_nodes_from_documents([document])
+
     index = VectorStoreIndex.from_vector_store(vector_store, embed_model=get_embed_model())
-    index.insert(document)
-    logger.info("Documento indexado: %s (doc_id=%s)", source, doc_id)
+    index.insert_nodes(nodes)
+    logger.info(
+        "Documento indexado: %s (doc_id=%s, %d chunks semanticos)",
+        source,
+        doc_id,
+        len(nodes),
+    )
     return doc_id
 
 

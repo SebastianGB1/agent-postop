@@ -123,6 +123,29 @@ async function openDetail(docId) {
   }
 }
 
+function openSourcesDetail(summary, referencias) {
+  detailTitle.textContent = `Fuentes usadas — ${summary.nombre_paciente || summary.paciente_id || "paciente"}`;
+  detailChunks.innerHTML = "";
+
+  for (const ref of referencias) {
+    const div = document.createElement("div");
+    div.className = "chunk";
+
+    const idDiv = document.createElement("div");
+    idDiv.className = "chunk-id";
+    idDiv.textContent = ref.fuente || "?";
+
+    const textDiv = document.createElement("div");
+    textDiv.textContent = ref.consulta ? `Consulta: ${ref.consulta}` : "—";
+
+    div.appendChild(idDiv);
+    div.appendChild(textDiv);
+    detailChunks.appendChild(div);
+  }
+
+  overlay.classList.remove("hidden");
+}
+
 async function deleteDocument(docId, filename) {
   if (!confirm(`Eliminar "${filename}" del indice?`)) return;
 
@@ -261,6 +284,12 @@ function renderSummaries(summaries) {
     badge.textContent = CLASIFICACION_LABELS[summary.clasificacion] || summary.clasificacion;
     classCell.appendChild(badge);
 
+    const escaladoCell = document.createElement("td");
+    const escaladoBadge = document.createElement("span");
+    escaladoBadge.className = `badge ${summary.escalado ? "badge-rojo" : "badge-verde"}`;
+    escaladoBadge.textContent = summary.escalado ? "Sí" : "No";
+    escaladoCell.appendChild(escaladoBadge);
+
     const detailCell = document.createElement("td");
     detailCell.className = "summary-detail";
     const parts = [];
@@ -268,13 +297,32 @@ function renderSummaries(summaries) {
     if (summary.siguientes_pasos) parts.push(`Próximos pasos: ${summary.siguientes_pasos}`);
     detailCell.textContent = parts.join("\n") || "—";
 
+    const justificacionCell = document.createElement("td");
+    justificacionCell.className = "summary-detail";
+    justificacionCell.textContent = summary.justificacion || "—";
+
+    const sourcesCell = document.createElement("td");
+    const referencias = summary.referencias_usadas || [];
+    if (referencias.length === 0) {
+      sourcesCell.textContent = "—";
+    } else {
+      const sourcesBtn = document.createElement("button");
+      sourcesBtn.className = "link-btn";
+      sourcesBtn.textContent = `Ver fuentes (${referencias.length})`;
+      sourcesBtn.addEventListener("click", () => openSourcesDetail(summary, referencias));
+      sourcesCell.appendChild(sourcesBtn);
+    }
+
     const dateCell = document.createElement("td");
     dateCell.textContent = new Date(summary.creado_ts).toLocaleString();
 
     row.appendChild(patientCell);
     row.appendChild(procCell);
     row.appendChild(classCell);
+    row.appendChild(escaladoCell);
     row.appendChild(detailCell);
+    row.appendChild(justificacionCell);
+    row.appendChild(sourcesCell);
     row.appendChild(dateCell);
     summaryTableBody.appendChild(row);
   }

@@ -137,6 +137,16 @@ td.summary-detail {
   white-space: pre-wrap;
 }
 
+.link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  font-size: 0.85rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .job-error {
   color: var(--danger);
   font-size: 0.8rem;

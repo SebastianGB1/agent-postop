@@ -8,6 +8,7 @@ elabore la respuesta hablada.
 
 import logging
 
+from llama_index.core.vector_stores import MetadataFilter, MetadataFilters
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.services.llm_service import FunctionCallParams
 
@@ -17,18 +18,31 @@ from agent.rag.store import get_index
 logger = logging.getLogger(__name__)
 
 
-def build_knowledge_base_tool(referencias_usadas: list[dict]) -> FunctionSchema:
+def build_knowledge_base_tool(referencias_usadas: list[dict], categoria: str | None = None) -> FunctionSchema:
     """Crea el tool de RAG para una llamada especifica.
+
+    `categoria` limita la busqueda a los documentos de la especialidad del
+    procedimiento del paciente actual (agent/rag/categories.py), para que no
+    aparezcan guias de otra especialidad solo porque el embedding de la
+    pregunta se les parece un poco -por ejemplo, una guia de apendicitis en
+    la llamada de un paciente de reemplazo de cadera/rodilla. Sin categoria
+    (paciente no identificado, o procedimiento sin categoria conocida), la
+    busqueda queda sin filtrar.
 
     `referencias_usadas` se llena con cada fuente recuperada durante la
     llamada, para que el resumen final (agent/decision.py) pueda adjuntar
     referencias verificables en vez de depender de que el LLM las recuerde.
     """
+    filters = (
+        MetadataFilters(filters=[MetadataFilter(key="categoria", value=categoria)])
+        if categoria
+        else None
+    )
 
     async def _buscar_en_base_de_conocimiento(params: FunctionCallParams) -> None:
         consulta = params.arguments.get("consulta", "")
 
-        retriever = get_index().as_retriever(similarity_top_k=RAG_TOP_K)
+        retriever = get_index().as_retriever(similarity_top_k=RAG_TOP_K, filters=filters)
         nodes = await retriever.aretrieve(consulta)
 
         if not nodes:

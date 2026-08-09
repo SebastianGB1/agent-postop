@@ -39,8 +39,14 @@ from pipecat.transcriptions.language import Language
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.workers.runner import WorkerRunner
 
-from agent.decision import build_registrar_resumen_tool, save_call_summary
+from agent.decision import (
+    build_registrar_dominio_tool,
+    build_registrar_resumen_tool,
+    save_call_summary,
+)
+from agent.history_tool import build_historial_medico_tool
 from agent.patients import get_patient_context, list_patients
+from agent.rag.categories import categoria_por_procedimiento
 from agent.rag.tool import build_knowledge_base_tool
 
 load_dotenv(override=True)
@@ -73,6 +79,14 @@ SYSTEM_PROMPT = (
     "dijo ni encadenes varias ideas en un mismo turno; entre mas corto, mejor "
     "se siente en una llamada real.\n\n"
     "Tu mision en cada llamada:\n"
+    "0. Al iniciar la llamada, antes de preguntar por sintomas, usa la "
+    "herramienta consultar_historial_medico para conocer el procedimiento, "
+    "comorbilidades, complicaciones registradas y el resultado de llamadas de "
+    "seguimiento previas del paciente. Usa ese contexto para interpretar mejor "
+    "lo que te cuente -por ejemplo, una comorbilidad o una clasificacion previa "
+    "puede cambiar que tan seria es una senal- pero nunca lo repitas textual ni "
+    "asumas que los sintomas de hoy son los mismos que antes: siguen siendo "
+    "datos que debes indagar de nuevo en esta llamada.\n"
     "1. Recorre estos seis dominios clinicos EN ESTE ORDEN, uno por turno -una "
     "pregunta a la vez, espera la respuesta antes de pasar al siguiente-: "
     "(a) dolor: donde lo siente y que tan fuerte es, del 1 al 10; "
@@ -82,7 +96,11 @@ SYSTEM_PROMPT = (
     "(e) apetito: si ha logrado comer con normalidad o ha tenido nauseas; "
     "(f) sueno: si ha podido descansar o algo se lo interrumpe. "
     "Si el paciente menciona un sintoma fuera de estos dominios, indaga tambien "
-    "sobre eso.\n"
+    "sobre eso. Justo despues de que el paciente responda sobre un dominio -"
+    "antes de pasar al siguiente- llama a registrar_dominio_evaluado con ese "
+    "dominio y lo que reporto. registrar_resumen_llamada va a rechazar la "
+    "clasificacion si no registraste los seis; nunca clasifiques ni cierres la "
+    "llamada saltandote alguno.\n"
     "2. El paciente va a describir sus propios sintomas en lenguaje cotidiano y "
     "regional, y cada paciente tiene un estilo distinto de comunicarse; reconocelo "
     "y adapta tu forma de indagar sin saltarte ningun dominio:\n"
@@ -184,9 +202,13 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         ),
     )
 
+    categoria = categoria_por_procedimiento(patient["procedimiento"]) if patient else None
+
     context = LLMContext(
         tools=[
-            build_knowledge_base_tool(referencias_usadas),
+            build_knowledge_base_tool(referencias_usadas, categoria=categoria),
+            build_historial_medico_tool(paciente_id),
+            build_registrar_dominio_tool(call_state),
             build_registrar_resumen_tool(
                 paciente_id=paciente_id,
                 patient=patient,

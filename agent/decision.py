@@ -21,6 +21,8 @@ logger = logging.getLogger(__name__)
 
 CLASIFICACIONES = ("verde", "amarillo", "rojo", "sin_clasificar")
 
+DOMINIOS = ("dolor", "fiebre", "movilidad", "herida", "apetito", "sueno")
+
 
 def save_call_summary(
     *,
@@ -66,6 +68,66 @@ def save_call_summary(
         conn.commit()
 
 
+def build_registrar_dominio_tool(call_state: dict) -> FunctionSchema:
+    """Tool que el LLM llama despues de indagar cada uno de los seis dominios
+    clinicos (dolor, fiebre, movilidad, herida, apetito, sueno).
+
+    Guarda el avance en `call_state["dominios_evaluados"]` para que
+    `registrar_resumen_llamada` pueda verificar, sin depender de que el LLM lo
+    recuerde solo, que los seis se cubrieron antes de aceptar una
+    clasificacion.
+    """
+    call_state.setdefault("dominios_evaluados", {})
+
+    async def _registrar_dominio_evaluado(params: FunctionCallParams) -> None:
+        dominio = params.arguments.get("dominio", "")
+        if dominio not in DOMINIOS:
+            await params.result_callback(
+                f"Dominio invalido '{dominio}'. Debe ser uno de: {', '.join(DOMINIOS)}."
+            )
+            return
+
+        resumen = params.arguments.get("resumen", "")
+        call_state["dominios_evaluados"][dominio] = resumen
+
+        faltantes = [d for d in DOMINIOS if d not in call_state["dominios_evaluados"]]
+        if faltantes:
+            await params.result_callback(
+                f"Dominio '{dominio}' registrado. Todavia faltan por indagar: "
+                f"{', '.join(faltantes)}."
+            )
+        else:
+            await params.result_callback(
+                f"Dominio '{dominio}' registrado. Ya cubriste los seis dominios, "
+                "puedes clasificar y registrar el resumen de la llamada."
+            )
+
+    return FunctionSchema(
+        name="registrar_dominio_evaluado",
+        description=(
+            "Registra que ya indagaste un dominio clinico con el paciente y que "
+            "informacion reporto. Llamala una vez por cada uno de los seis "
+            "dominios (dolor, fiebre, movilidad, herida, apetito, sueno), justo "
+            "despues de recibir su respuesta y antes de pasar al siguiente. "
+            "registrar_resumen_llamada no va a aceptar una clasificacion si no "
+            "registraste los seis primero."
+        ),
+        properties={
+            "dominio": {
+                "type": "string",
+                "enum": list(DOMINIOS),
+                "description": "El dominio clinico que acabas de indagar.",
+            },
+            "resumen": {
+                "type": "string",
+                "description": "Que reporto el paciente sobre ese dominio, en 1 frase.",
+            },
+        },
+        required=["dominio", "resumen"],
+        handler=_registrar_dominio_evaluado,
+    )
+
+
 def build_registrar_resumen_tool(
     *,
     paciente_id: str | None,
@@ -80,6 +142,17 @@ def build_registrar_resumen_tool(
             await params.result_callback(
                 f"Clasificacion invalida '{clasificacion}'. Debe ser una de: "
                 f"{', '.join(CLASIFICACIONES)}."
+            )
+            return
+
+        dominios_evaluados = call_state.get("dominios_evaluados", {})
+        faltantes = [d for d in DOMINIOS if d not in dominios_evaluados]
+        if faltantes:
+            await params.result_callback(
+                "No puedes registrar el resumen todavia: te faltan por indagar y "
+                f"registrar con registrar_dominio_evaluado estos dominios: "
+                f"{', '.join(faltantes)}. Sigue la conversacion con el paciente "
+                "antes de clasificar."
             )
             return
 

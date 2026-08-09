@@ -33,6 +33,7 @@ class IngestJob:
     job_id: str
     filename: str
     tmp_path: Path
+    categoria: str | None = None
     status: JobStatus = "pending"
     doc_id: str | None = None
     error: str | None = None
@@ -51,14 +52,14 @@ def _uploads_dir() -> Path:
     return path
 
 
-async def enqueue(filename: str, content: bytes) -> IngestJob:
+async def enqueue(filename: str, content: bytes, categoria: str | None = None) -> IngestJob:
     job_id = str(uuid.uuid4())
     job_dir = _uploads_dir() / job_id
     job_dir.mkdir()
     tmp_path = job_dir / filename
     tmp_path.write_bytes(content)
 
-    job = IngestJob(job_id=job_id, filename=filename, tmp_path=tmp_path)
+    job = IngestJob(job_id=job_id, filename=filename, tmp_path=tmp_path, categoria=categoria)
     _jobs[job_id] = job
     await _queue.put(job_id)
     _ensure_worker_started()
@@ -86,7 +87,7 @@ async def _worker() -> None:
         job.status = "processing"
         job.updated_at = datetime.now(UTC)
         try:
-            job.doc_id = await asyncio.to_thread(add_document, job.tmp_path)
+            job.doc_id = await asyncio.to_thread(add_document, job.tmp_path, job.categoria)
             job.status = "done"
         except ClientError as exc:
             job.status = "error"

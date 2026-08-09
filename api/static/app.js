@@ -70,6 +70,9 @@ function renderDocuments(docs) {
     const nameCell = document.createElement("td");
     nameCell.textContent = doc.filename;
 
+    const categoriaCell = document.createElement("td");
+    categoriaCell.textContent = doc.categoria || "—";
+
     const countCell = document.createElement("td");
     countCell.textContent = doc.chunk_count;
 
@@ -84,6 +87,7 @@ function renderDocuments(docs) {
     actionCell.appendChild(deleteBtn);
 
     row.appendChild(nameCell);
+    row.appendChild(categoriaCell);
     row.appendChild(countCell);
     row.appendChild(actionCell);
     row.addEventListener("click", () => openDetail(doc.doc_id));
@@ -232,10 +236,12 @@ uploadForm.addEventListener("submit", async (e) => {
   uploadStatus.textContent = `Encolando ${files.length} archivo(s)...`;
   uploadStatus.classList.remove("error");
 
+  const categoria = document.getElementById("categoria-input").value;
   const formData = new FormData();
   for (const file of files) {
     formData.append("files", file);
   }
+  if (categoria) formData.append("categoria", categoria);
 
   try {
     const res = await fetch("/api/documents/uploads", { method: "POST", body: formData });

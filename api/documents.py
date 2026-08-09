@@ -9,9 +9,10 @@ cola de ingesta (api.jobs) para procesar varios archivos de a uno.
 import logging
 
 from chromadb.api.types import GetResult
-from fastapi import APIRouter, HTTPException, UploadFile
+from fastapi import APIRouter, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
+from agent.rag.categories import CATEGORIAS
 from agent.rag.ingest import remove_document
 from agent.rag.store import get_vector_store
 from api.jobs import IngestJob, enqueue, list_jobs
@@ -30,6 +31,7 @@ class DocumentSummary(BaseModel):
     doc_id: str
     filename: str
     chunk_count: int
+    categoria: str | None = None
 
 
 class DocumentDetail(BaseModel):
@@ -44,6 +46,7 @@ class JobStatus(BaseModel):
     status: str
     doc_id: str | None = None
     error: str | None = None
+    categoria: str | None = None
 
 
 def _to_job_status(job: IngestJob) -> JobStatus:
@@ -53,6 +56,7 @@ def _to_job_status(job: IngestJob) -> JobStatus:
         status=job.status,
         doc_id=job.doc_id,
         error=job.error,
+        categoria=job.categoria,
     )
 
 
@@ -68,6 +72,7 @@ def list_documents() -> list[DocumentSummary]:
 
     counts: dict[str, int] = {}
     filenames: dict[str, str] = {}
+    categorias: dict[str, str] = {}
     for metadata in metadatas:
         doc_id = metadata.get("document_id") if metadata else None
         if not doc_id:
@@ -75,25 +80,37 @@ def list_documents() -> list[DocumentSummary]:
         doc_id = str(doc_id)
         counts[doc_id] = counts.get(doc_id, 0) + 1
         filenames.setdefault(doc_id, str(metadata.get("source", "")))
+        categorias.setdefault(doc_id, str(metadata.get("categoria", "")) or None)
 
     return [
-        DocumentSummary(doc_id=doc_id, filename=filenames[doc_id], chunk_count=count)
+        DocumentSummary(
+            doc_id=doc_id, filename=filenames[doc_id], chunk_count=count, categoria=categorias[doc_id]
+        )
         for doc_id, count in sorted(counts.items(), key=lambda item: filenames[item[0]])
     ]
 
 
 @router.post("/uploads", response_model=list[JobStatus], status_code=202)
-async def upload_documents(files: list[UploadFile]) -> list[JobStatus]:
-    """Encola uno o varios archivos para indexarlos de a uno en segundo plano."""
+async def upload_documents(
+    files: list[UploadFile], categoria: str | None = Form(default=None)
+) -> list[JobStatus]:
+    """Encola uno o varios archivos para indexarlos de a uno en segundo plano.
+
+    `categoria` (opcional) etiqueta todos los archivos del lote con la misma
+    especialidad clinica (ver agent/rag/categories.py), para que el agente
+    pueda filtrar la busqueda por el procedimiento del paciente.
+    """
     if not files:
         raise HTTPException(status_code=400, detail="Debes subir al menos un archivo")
+    if categoria is not None and categoria not in CATEGORIAS:
+        raise HTTPException(status_code=400, detail=f"Categoria invalida: {categoria}")
 
     jobs = []
     for file in files:
         if not file.filename:
             raise HTTPException(status_code=400, detail="Cada archivo debe tener un nombre")
         content = await file.read()
-        jobs.append(await enqueue(file.filename, content))
+        jobs.append(await enqueue(file.filename, content, categoria=categoria))
 
     return [_to_job_status(job) for job in jobs]
 

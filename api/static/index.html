@@ -16,6 +16,14 @@
     <section class="upload-panel">
       <form id="upload-form">
         <input type="file" id="file-input" name="files" multiple required />
+        <select id="categoria-input" name="categoria">
+          <option value="">Sin categoria</option>
+          <option value="Appendicitis">Appendicitis</option>
+          <option value="breast_cancer">breast_cancer</option>
+          <option value="cholecystitis">cholecystitis</option>
+          <option value="colorectal cancer">colorectal cancer</option>
+          <option value="total joint replacement">total joint replacement</option>
+        </select>
         <button type="submit">Subir e indexar</button>
       </form>
       <p id="upload-status" class="status"></p>
@@ -43,6 +51,7 @@
         <thead>
           <tr>
             <th>Documento</th>
+            <th>Categoria</th>
             <th>Fragmentos</th>
             <th></th>
           </tr>

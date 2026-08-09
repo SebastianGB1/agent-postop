@@ -19,7 +19,7 @@ from api.db.connection import get_dsn
 
 logger = logging.getLogger(__name__)
 
-CLASIFICACIONES = ("verde", "amarillo", "rojo")
+CLASIFICACIONES = ("verde", "amarillo", "rojo", "sin_clasificar")
 
 
 def save_call_summary(
@@ -110,6 +110,13 @@ def build_registrar_resumen_tool(
                 "contacto con el de forma prioritaria. No minimices el sintoma ni lo "
                 "tranquilices de mas."
             )
+        elif clasificacion == "sin_clasificar":
+            await params.result_callback(
+                "Resumen guardado sin clasificar por falta de fuentes que respalden una "
+                "decision. Dile al paciente con honestidad que no tienes informacion "
+                "suficiente para evaluar bien su caso, y recomiendale contactar "
+                "directamente a su equipo medico si el sintoma le preocupa."
+            )
         else:
             await params.result_callback("Resumen guardado. Puedes continuar o cerrar la llamada.")
 
@@ -129,7 +136,11 @@ def build_registrar_resumen_tool(
                     "verde: sin senales de alarma, recuperacion normal. amarillo: "
                     "sintomas que ameritan vigilancia pero no son de emergencia. rojo: "
                     "senales de alarma que requieren atencion medica urgente. Ante "
-                    "ambigüedad o duda entre dos niveles, elige el mas alto."
+                    "ambigüedad o duda entre dos niveles, elige el mas alto. "
+                    "sin_clasificar: usala unicamente cuando buscaste en la base de "
+                    "conocimiento y no encontraste fuentes que respalden ninguna de las "
+                    "tres clasificaciones anteriores para los sintomas reportados -nunca "
+                    "elijas verde, amarillo o rojo sin una fuente que lo sustente."
                 ),
             },
             "sintomas_reportados": {
@@ -138,7 +149,11 @@ def build_registrar_resumen_tool(
             },
             "justificacion": {
                 "type": "string",
-                "description": "Por que se eligio esa clasificacion, en 1-2 frases.",
+                "description": (
+                    "Por que se eligio esa clasificacion, en 1-2 frases, citando la guia "
+                    "clinica consultada. Si es sin_clasificar, explica que no se encontro "
+                    "informacion en la base de conocimiento para respaldar una decision."
+                ),
             },
             "siguientes_pasos": {
                 "type": "string",

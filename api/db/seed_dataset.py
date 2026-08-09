@@ -1,6 +1,6 @@
 """Carga los cuatro archivos de dataset/ en Postgres.
 
-Aplica la migracion (api/db/migrations/0001_init.sql) y luego puebla las
+Aplica las migraciones (api/db/migrations/*.sql, en orden) y luego puebla las
 tablas en orden de dependencia: pacientes_demografia -> perfiles_clinicos ->
 trayectorias_postop -> conversaciones_turnos. Es idempotente: trunca las
 tablas antes de insertar, asi que se puede correr varias veces.
@@ -53,9 +53,9 @@ def _read_sheet(filename: str) -> pd.DataFrame:
     return pd.read_excel(DATASET_DIR / filename, sheet_name="result")
 
 
-def _apply_migration(cur: psycopg.Cursor) -> None:
-    sql = (MIGRATIONS_DIR / "0001_init.sql").read_text(encoding="utf-8")
-    cur.execute(sql)
+def _apply_migrations(cur: psycopg.Cursor) -> None:
+    for migration in sorted(MIGRATIONS_DIR.glob("*.sql")):
+        cur.execute(migration.read_text(encoding="utf-8"))
 
 
 def _load_pacientes_demografia(cur: psycopg.Cursor) -> int:
@@ -192,7 +192,7 @@ def main() -> None:
 
     with psycopg.connect(get_dsn(), autocommit=False) as conn:
         with conn.cursor() as cur:
-            _apply_migration(cur)
+            _apply_migrations(cur)
             cur.execute(
                 "TRUNCATE conversaciones_turnos, trayectorias_postop, "
                 "perfiles_clinicos, pacientes_demografia RESTART IDENTITY CASCADE"

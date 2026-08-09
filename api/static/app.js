@@ -10,6 +10,17 @@ const detailChunks = document.getElementById("detail-chunks");
 const closeDetailBtn = document.getElementById("close-detail");
 const jobTableBody = document.getElementById("job-table-body");
 const jobCount = document.getElementById("job-count");
+const summaryTableBody = document.getElementById("summary-table-body");
+const summaryCount = document.getElementById("summary-count");
+const summaryStatus = document.getElementById("summary-status");
+const refreshSummariesBtn = document.getElementById("refresh-summaries-btn");
+
+const CLASIFICACION_LABELS = {
+  verde: "Verde",
+  amarillo: "Amarillo",
+  rojo: "Rojo",
+  sin_clasificar: "Sin clasificar",
+};
 
 const STATUS_LABELS = {
   pending: "Pendiente",
@@ -203,6 +214,62 @@ uploadForm.addEventListener("submit", async (e) => {
     uploadStatus.classList.add("error");
   }
 });
+
+async function loadSummaries() {
+  summaryStatus.textContent = "Cargando...";
+  summaryStatus.classList.remove("error");
+  try {
+    const res = await fetch("/api/summaries");
+    if (!res.ok) throw new Error(`Error ${res.status}`);
+    const summaries = await res.json();
+    renderSummaries(summaries);
+    summaryStatus.textContent = "";
+  } catch (err) {
+    summaryStatus.textContent = `No se pudo cargar la lista: ${err.message}`;
+    summaryStatus.classList.add("error");
+  }
+}
+
+function renderSummaries(summaries) {
+  summaryCount.textContent = summaries.length;
+  summaryTableBody.innerHTML = "";
+
+  for (const summary of summaries) {
+    const row = document.createElement("tr");
+
+    const patientCell = document.createElement("td");
+    patientCell.textContent = summary.nombre_paciente || summary.paciente_id || "—";
+
+    const procCell = document.createElement("td");
+    procCell.textContent = summary.procedimiento || "—";
+
+    const classCell = document.createElement("td");
+    const badge = document.createElement("span");
+    badge.className = `badge badge-${summary.clasificacion}`;
+    badge.textContent = CLASIFICACION_LABELS[summary.clasificacion] || summary.clasificacion;
+    classCell.appendChild(badge);
+
+    const detailCell = document.createElement("td");
+    detailCell.className = "summary-detail";
+    const parts = [];
+    if (summary.sintomas_reportados) parts.push(`Síntomas: ${summary.sintomas_reportados}`);
+    if (summary.siguientes_pasos) parts.push(`Próximos pasos: ${summary.siguientes_pasos}`);
+    detailCell.textContent = parts.join("\n") || "—";
+
+    const dateCell = document.createElement("td");
+    dateCell.textContent = new Date(summary.creado_ts).toLocaleString();
+
+    row.appendChild(patientCell);
+    row.appendChild(procCell);
+    row.appendChild(classCell);
+    row.appendChild(detailCell);
+    row.appendChild(dateCell);
+    summaryTableBody.appendChild(row);
+  }
+}
+
+refreshSummariesBtn.addEventListener("click", loadSummaries);
+loadSummaries();
 
 refreshBtn.addEventListener("click", loadDocuments);
 closeDetailBtn.addEventListener("click", () => overlay.classList.add("hidden"));

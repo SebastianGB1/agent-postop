@@ -4,7 +4,7 @@ Transporte: WebRTC nativo (aiortc), sin dependencia de daily-python
 (que no publica wheels para Windows). Se sirve un cliente web local
 para hablar con el bot desde el navegador.
 
-Pipeline: WebRTC (audio in) -> Deepgram (STT) -> Gemini (LLM) -> Cartesia (TTS) -> WebRTC (audio out).
+Pipeline: WebRTC (audio in) -> Deepgram (STT) -> Gemini (LLM) -> Kokoro (TTS) -> WebRTC (audio out).
 
 Uso:
     python bot.py
@@ -32,9 +32,9 @@ from pipecat.processors.aggregators.llm_response_universal import (
 from pipecat.runner.run import app as runner_app
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
-from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.google.llm import GoogleLLMService
+from pipecat.services.kokoro.tts import KokoroTTSService
 from pipecat.transcriptions.language import Language
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.workers.runner import WorkerRunner
@@ -67,8 +67,11 @@ async def _list_patients():
 SYSTEM_PROMPT = (
     "Eres Larry, un asistente de voz de seguimiento postoperatorio que conversa "
     "siempre en espanol. Tus respuestas se convierten a audio, asi que evita "
-    "emojis, markdown o cualquier formato que no se pueda hablar. Responde de "
-    "forma breve, clara y natural, como en una conversacion hablada.\n\n"
+    "emojis, markdown o cualquier formato que no se pueda hablar. Habla poco: "
+    "en cada turno di una sola frase, idealmente una sola linea -nunca mas de "
+    "dos-, y haz una sola pregunta a la vez. No repitas lo que el paciente ya "
+    "dijo ni encadenes varias ideas en un mismo turno; entre mas corto, mejor "
+    "se siente en una llamada real.\n\n"
     "Tu mision en cada llamada:\n"
     "1. Recorre estos seis dominios clinicos EN ESTE ORDEN, uno por turno -una "
     "pregunta a la vez, espera la respuesta antes de pasar al siguiente-: "
@@ -157,10 +160,9 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         ),
     )
 
-    tts = CartesiaTTSService(
-        api_key=os.environ["CARTESIA_API_KEY"],
-        settings=CartesiaTTSService.Settings(
-            voice=os.environ["CARTESIA_VOICE_ID"],
+    tts = KokoroTTSService(
+        settings=KokoroTTSService.Settings(
+            voice=os.getenv("KOKORO_VOICE_ID", "em_alex"),
             language=Language.ES,
         ),
     )

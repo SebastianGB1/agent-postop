@@ -357,31 +357,37 @@
       statusLabelEl.textContent = label;
     }
 
-    const client = new PipecatClient({
-      transport: new SmallWebRTCTransport(),
-      enableMic: true,
-      enableCam: false,
-      callbacks: {
-        onUserTranscript: (data) => {
-          if (data.final) appendLine("Paciente", data.text);
+    function createClient() {
+      return new PipecatClient({
+        transport: new SmallWebRTCTransport(),
+        enableMic: true,
+        enableCam: false,
+        callbacks: {
+          onUserTranscript: (data) => {
+            if (data.final) appendLine("Paciente", data.text);
+          },
+          onBotTranscript: (data) => {
+            appendLine("Agente", data.text);
+          },
+          onTrackStarted: (track, participant) => {
+            if (track.kind === "audio" && !participant?.local) {
+              botAudioEl.srcObject = new MediaStream([track]);
+            }
+          },
+          onDisconnected: () => setConnected(false),
+          onError: (message) => appendLine("Error", message?.data?.error ?? String(message)),
         },
-        onBotTranscript: (data) => {
-          appendLine("Agente", data.text);
-        },
-        onTrackStarted: (track, participant) => {
-          if (track.kind === "audio" && !participant?.local) {
-            botAudioEl.srcObject = new MediaStream([track]);
-          }
-        },
-        onDisconnected: () => setConnected(false),
-        onError: (message) => appendLine("Error", message?.data?.error ?? String(message)),
-      },
-    });
+      });
+    }
 
+    // SmallWebRTCTransport closes its RTCPeerConnection on disconnect and
+    // can't reopen it, so each connection attempt needs a fresh client
+    // instance instead of reusing one across the page's lifetime.
+    let client = createClient();
     let connected = false;
 
-    function updateMicButton() {
-      const enabled = client.isMicEnabled;
+    function updateMicButton(enabledOverride) {
+      const enabled = enabledOverride ?? client.isMicEnabled;
       micBtn.textContent = enabled ? "🎤 Micrófono encendido" : "🔇 Micrófono apagado";
       micBtn.classList.toggle("active", enabled);
       micBtn.classList.toggle("muted", !enabled);
@@ -408,6 +414,7 @@
       connectBtn.textContent = "Conectando…";
       setStatus("connecting", "Conectando…");
       patientSelect.disabled = true;
+      client = createClient();
       try {
         await client.startBotAndConnect({
           endpoint: "/start",
@@ -424,8 +431,9 @@
     });
 
     micBtn.addEventListener("click", () => {
-      client.enableMic(!client.isMicEnabled);
-      updateMicButton();
+      const enabled = !client.isMicEnabled;
+      client.enableMic(enabled);
+      updateMicButton(enabled);
     });
   </script>
 </body>

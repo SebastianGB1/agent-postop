@@ -65,13 +65,12 @@ services:
   agent:
     build: .
     container_name: larry-agent
+    network_mode: host
     command: ["python", "-m", "agent.agent", "--host", "0.0.0.0"]
-    ports:
-      - "7860:7860"
     environment:
-      CHROMA_HOST: chromadb
-      CHROMA_PORT: "8000"
-      POSTGRES_HOST: postgres
+      CHROMA_HOST: localhost
+      CHROMA_PORT: "8001"
+      POSTGRES_HOST: localhost
       POSTGRES_PORT: "5432"
       POSTGRES_DB: agent-larry
       POSTGRES_USER: agent

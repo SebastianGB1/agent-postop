@@ -326,5 +326,62 @@ Parámetros:
 
 ---
 
+## 12. Diagrama de flujo de decisión del agente
+
+```mermaid
+flowchart TD
+    A([Inicia la llamada]) --> B[Tool: consultar_historial_medico]
+    B --> C[Saludo inicial al paciente]
+    C --> D{"Dominio actual:\ndolor → fiebre → movilidad →\nherida → apetito → sueño"}
+    D --> E[Pregunta el dominio actual\n1 sola pregunta por turno]
+    E --> F[Paciente responde]
+    F --> G[Tool: registrar_dominio_evaluado]
+    G --> H{¿Faltan dominios\npor cubrir?}
+    H -- Sí --> D
+    H -- No, los 6 cubiertos --> I[Tool: buscar_en_base_de_conocimiento]
+    I --> J{¿Se encontró una fuente\nque respalde una clasificación?}
+    J -- No --> K[Clasificación = sin_clasificar]
+    J -- Sí --> L{¿Información suficiente\ny sin ambigüedad?}
+    L -- No, sigue indagando --> D
+    L -- Sí --> M{Clasificar criticidad\nante duda, elegir el nivel más alto}
+    M -- Sin señales de alarma --> N[Clasificación = verde]
+    M -- Requiere vigilancia --> O[Clasificación = amarillo]
+    M -- Señales de alarma urgentes --> P[Clasificación = rojo]
+    K --> Q[Tool: registrar_resumen_llamada]
+    N --> Q
+    O --> Q
+    P --> Q
+    Q --> R{"¿Los 6 dominios están\nregistrados en call_state?"}
+    R -- No --> S[Handler rechaza el registro\ny devuelve dominios faltantes]
+    S --> D
+    R -- Sí --> T[Guarda resumen en Postgres\ncon referencias_usadas]
+    T --> U{Resultado}
+    U -- rojo --> V[Comunica escalamiento:\ncontacto médico prioritario]
+    U -- amarillo --> W[Comunica vigilancia,\nsin alarmar]
+    U -- sin_clasificar --> X[Comunica honestamente\nque falta información]
+    U -- verde --> Y[Confirma recuperación normal]
+    V --> Z([Cierra la llamada])
+    W --> Z
+    X --> Z
+    Y --> Z
+
+    Z -.-> AA{"on_client_disconnected:\n¿call_state.registrado?"}
+    AA -- No --> AB[Red de seguridad:\nguarda resumen sin_clasificar\nautomáticamente]
+```
+
+**Notas sobre el diagrama:**
+
+- El paso de `buscar_en_base_de_conocimiento` no es un único punto fijo: el prompt lo
+  exige antes de cualquier clasificación o indicación al paciente, así que en la
+  práctica el agente puede consultarlo varias veces durante los seis dominios, no solo
+  al final. Se dibuja una vez, después del loop de dominios, para simplificar el flujo
+  principal.
+- La compuerta de `R` (dominios completos) es una verificación de código en
+  `agent/decision.py`, no una instrucción que el LLM pueda decidir saltarse — es la
+  garantía dura detrás de "nunca clasifiques sin haber cubierto los seis dominios".
+- La rama punteada (`Z -.-> AA`) no es parte del flujo conversacional: es el manejador
+  `on_client_disconnected` de Pipecat, que corre en paralelo como red de seguridad si
+  el paciente cuelga antes de que el agente complete su propio cierre.
+
 ## Diagrama de arquitectura (pendiente)
 

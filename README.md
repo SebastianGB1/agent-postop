@@ -1,3 +1,13 @@
+## Informe final
+
+Ver [`docs/informe-final.md`](docs/informe-final.md) para el detalle de las decisiones
+de arquitectura, el pipeline de voz, el RAG, la lógica de decisión/escalamiento y los
+diagramas de flujo y arquitectura.
+
+## Video demo
+
+[youtu.be/dngXoimr3TY](https://youtu.be/dngXoimr3TY)
+
 ## Cómo levantar el proyecto (Docker)
 
 Requisitos: Docker y Docker Compose. Todo el stack —Postgres, ChromaDB, la consola de

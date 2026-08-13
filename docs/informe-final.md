@@ -385,7 +385,5 @@ flowchart TD
 
 ## 13. Diagrama de arquitectura
 
-<iframe width="768" height="640" src="https://miro.com/app/live-embed/uXjVMF3RZDQ=/?focusWidget=3458764680650261755&embedMode=view_only_without_ui&embedId=681883162881" frameborder="0" scrolling="no" allow="fullscreen; clipboard-read; clipboard-write" allowfullscreen></iframe>
-
 Versión interactiva en Miro: [Aqui](https://miro.com/app/live-embed/uXjVMF3RZDQ=/?focusWidget=3458764680650261755&embedMode=view_only_without_ui&embedId=681883162881)
 

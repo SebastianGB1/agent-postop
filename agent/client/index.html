@@ -375,7 +375,7 @@
             }
           },
           onDisconnected: () => setConnected(false),
-          onError: (message) => appendLine("Error", message?.data?.error ?? String(message)),
+          onError: (message) => console.error("Pipecat error:", message?.data?.error ?? message),
         },
       });
     }
